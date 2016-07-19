@@ -1,0 +1,92 @@
+#!/bin/bash
+
+#set -x
+
+function getOptions() {
+  while getopts "idsl:h:p:" options; do
+    case $options in
+      p )
+        W3M_PARAMETERS="$OPTARG"
+        ;;
+      i )
+        SEARCH_HOST="ixquick.com"
+        ;;
+      l )
+        LIMIT="$OPTARG"
+        ;;
+      h )
+        HOST="host:$OPTARG "
+        ;;
+      s )
+        STDOUT_PRINT="1"
+        ;;
+      d )
+        DRY_RUN="1"
+        ;;
+      \? )
+        echo "HELP"
+        echo "host:stackoverflow.com +java +method -chain
+host:stackoverflow.com 'java method'
+(java OR method OR chain)
+java AND (kodkdkjfkdj OR hello)
+java ANDNOT hello
+java NOT hello"
+        exit 1
+        ;;
+    esac
+  done
+  PARSED_OPT_COUNT=$OPTIND
+}
+
+getOptions $@
+shift $(( PARSED_OPT_COUNT - 1 ));
+
+ORIGINAL_QUERY=$@
+QUERY=$( echo "$ORIGINAL_QUERY" |  tr "'" '"')
+if [ -n "$DRY_RUN" ];then
+  echo "$ORIGINAL_QUERY"
+  echo "$QUERY"
+fi
+
+: ${LIMIT:=10}
+: ${SEARCH_HOST:="startpage.com"}
+
+PRFH="prfh=lang_homepageEEEs%2Fwhite%2Feng%2FN1Nfont_sizeEEEmediumN1Nrecent_results_filterEEE1N1Nlanguage_uiEEEenglishN1Nsearch_engine_sourcesEEE1N1Ndisable_open_in_new_windowEEE0N1NsslEEE1N1Nnum_of_resultsEEE${LIMIT}N1N"
+DEFAULT_VALUES="cat=web&cmd=process_search&language=english&engine0=v1all&x=12&y=24" 
+POST_QUERIES="${PRFH}&${DEFAULT_VALUES}&query=$(urlencode "${HOST}${QUERY}")"
+
+if [ -n "$DRY_RUN" ];then
+  echo "HOST:https://${SEARCH_HOST}/do/metasearch.pl" 1>&2
+  echo "BODY:$POST_QUERIES" 1>&2
+  exit 0
+fi
+
+BODY=$( \
+  curl \
+    -s \
+    -XPOST \
+    -d "$POST_QUERIES" \
+    "https://${SEARCH_HOST}/do/metasearch.pl" \
+| tidy -asxhtml -qi 2>/dev/null \
+| hxselect "ol" \
+| hxremove "script" \
+| hxremove ".ix-icons" \
+| hxremove ".links_beside_url" \
+| sed -e "1i<title>search: $ORIGINAL_QUERY</title>" \
+| hxnormalize -ex \
+| sed \
+    -e 's/<p/<span/g' \
+    -e 's/<\/p/<\/span/g' \
+    -e 's/<h3/<b/g' \
+    -e 's/<\/h3/<\/b/g' \
+    -e 's/\(<span class="desc\)/<br\/>\1/g' \
+    -e '/^ *onclick=".*"$/d' \
+    -e '/^ *$/d' \
+)
+
+if [ -n "$STDOUT_PRINT" ];then
+  echo "$BODY"
+else
+  echo "$BODY" | w3m -no-cookie -T text/html $W3M_PARAMETERS
+fi
+
