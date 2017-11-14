@@ -55,7 +55,7 @@ BODY=$( \
     -XPOST \
     -d "$POST_QUERIES" \
     "https://${SEARCH_HOST}/do/metasearch.pl" \
-| tidy -asxhtml -qi 2>/dev/null \
+| tidy -raw -asxhtml -qi 2>/dev/null \
 | hxselect "ol" \
 | hxremove "script" \
 | hxremove ".ix-icons" \

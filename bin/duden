@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+websearch -s "host:www.duden.de $@"  \
+  | hxremove ".didyouMean" \
+  | hxremove ".ads_desc_stuff_normal" \
+  | hxremove "b" \
+  | hxremove "br" \
+  | html2text -nobs -width "1000" \
+  | sed "s/^\(.\{,$(tput cols)\}\).*\$/\1/g"
+
+
+  # | hxremove "#result6" \
+  # | hxremove "#result7" \
+  # | hxremove "#result8" \
+  # | hxremove "#result9" \
+  # | hxremove "#result10" \
+
+
